@@ -1,0 +1,63 @@
+#!/bin/bash
+
+#paramater
+targetName=""
+if [ $# -gt 0 ]; then
+    targetName=$1
+fi
+
+SSH_CONFIG=$HOME/.ssh/config
+if [ ! -e $SSH_CONFIG ]; then
+    echo "couldn't find the ssh config file. [$(SSH_CONFIG)]"
+    exit 0
+fi
+
+aryHosts=()
+while read line
+do
+    # trim
+    echo $line > line
+    # replace tabs to spaces
+    echo ${line//\t/" "} > line
+    # sumup spaces to a space
+    echo "$line" | sed -e 's/  */ /g' > line
+    # is this target line?
+    if [ -n "$line" ] && [ "`echo $line | grep -i '^host '`" ]; then
+        hostname="${line:5}"
+        if [ -n "$targetName" ]; then
+            if [ "`echo $hostname | grep -i $targetName`" ]; then
+                aryHosts+=($hostname)
+            fi
+        else
+            aryHosts+=($hostname)
+        fi
+    fi
+
+done < $SSH_CONFIG
+
+i=1
+for hostname in "${aryHosts[@]}"
+do
+    echo "$i) $hostname"
+    ((i++))
+done
+
+# 20 is a safty limit to avoid an infinity loop
+for ((i=0; i < 20; i++)); do
+    read -p 'Enter the number to ssh. C will be canceled. : ' selectedNum
+    if [ $selectedNum = "C" ] || [ $selectedNum = "c" ]; then
+        exit 0
+    fi
+
+    # number entered?
+    if expr "$selectedNum" : "[0-9]*$" >&/dev/null;then
+        if [ $selectedNum -gt 0 ] && [ $selectedNum -le ${#aryHosts[@]} ]; then
+            #echo ${aryHosts[$(($selectedNum-1))]}
+            echo "ssh ${aryHosts[$(($selectedNum-1))]}"
+            ssh ${aryHosts[$(($selectedNum-1))]}
+            break
+        fi
+    fi
+done
+
+exit 0
